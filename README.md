@@ -1,2 +1,4 @@
-# sistema-controle-episV2.0
-Sistema web para controle de Equipamentos de Proteção Individual (EPIs).V2.0
+1. Descompacte esta pasta
+2. Abra o arquivo sistema-epis.html em qualquer navegador
+3. Faça login com admin/admin123
+4. Importe os arquivos CSV incluídos (se aplicável)
