@@ -1,0 +1,2733 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Controle de EPIs</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js para gráficos de relatórios -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- jsPDF para exportação de PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+    <!-- SheetJS para exportação de Excel -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#5D5CDE',
+                        danger: '#ef4444',
+                        success: '#10b981',
+                        warning: '#f59e0b',
+                        info: '#3b82f6'
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <!-- Tela de Login -->
+    <div id="tela-login" class="min-h-screen flex items-center justify-center">
+        <div class="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
+            <div class="text-center mb-6">
+                <h1 class="text-2xl font-bold text-primary">Sistema de Controle de EPIs</h1>
+                <p class="text-gray-600">Faça login para acessar o sistema</p>
+            </div>
+            
+            <form id="form-login" class="space-y-4">
+                <div>
+                    <label for="usuario" class="block text-sm font-medium text-gray-700 mb-1">Usuário</label>
+                    <input 
+                        type="text" 
+                        id="usuario" 
+                        required 
+                        class="w-full px-3 py-2 border border-gray-300 rounded-md text-base focus:outline-none focus:ring-2 focus:ring-primary"
+                    >
+                </div>
+                
+                <div>
+                    <label for="senha" class="block text-sm font-medium text-gray-700 mb-1">Senha</label>
+                    <input 
+                        type="password" 
+                        id="senha" 
+                        required 
+                        class="w-full px-3 py-2 border border-gray-300 rounded-md text-base focus:outline-none focus:ring-2 focus:ring-primary"
+                    >
+                </div>
+                
+                <div id="erro-login" class="hidden text-danger text-sm bg-red-50 p-2 rounded"></div>
+                
+                <button 
+                    type="submit" 
+                    class="w-full bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90"
+                >
+                    <i class="fas fa-sign-in-alt mr-2"></i> Entrar
+                </button>
+                
+                <div class="text-sm text-gray-600 bg-blue-50 p-2 rounded border border-blue-100">
+                    <p>Credenciais para teste:</p>
+                    <p><strong>Admin:</strong> admin / admin123</p>
+                    <p><strong>Operador:</strong> operador / operador123</p>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Tela Principal (fica oculta até o login) -->
+    <div id="tela-principal" class="hidden">
+        <div class="container mx-auto px-4 py-8">
+            <!-- Cabeçalho com informações do usuário -->
+            <header class="mb-8 flex flex-col md:flex-row md:justify-between md:items-center gap-4">
+                <div>
+                    <h1 class="text-3xl font-bold text-primary">Sistema de Controle de EPIs</h1>
+                    <p class="text-gray-600 mt-2">Gerencie os Equipamentos de Proteção Individual da empresa</p>
+                </div>
+                <div class="flex items-center bg-white py-2 px-4 rounded-lg shadow-sm">
+                    <span class="mr-4 flex items-center text-gray-700">
+                        <i class="fas fa-user-circle text-primary text-xl mr-2"></i>
+                        <span>
+                            <span class="text-sm text-gray-500">Usuário:</span><br>
+                            <span id="usuario-logado" class="font-medium">Nome do Usuário</span>
+                        </span>
+                    </span>
+                    <button 
+                        onclick="logout()" 
+                        class="bg-gray-200 text-gray-700 px-3 py-1 rounded hover:bg-gray-300 flex items-center"
+                    >
+                        <i class="fas fa-sign-out-alt mr-1"></i> Sair
+                    </button>
+                </div>
+            </header>
+            
+            <!-- Painel de gerenciamento de dados -->
+            <div class="bg-orange-100 border-orange-300 border-2 rounded-lg p-4 mb-6">
+                <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                    <div>
+                        <h3 class="font-bold text-orange-800 text-lg"><i class="fas fa-exclamation-triangle mr-2"></i>IMPORTANTE: Importação e Exportação</h3>
+                        <p class="text-orange-800 mt-1">Este sistema suporta importação e exportação via CSV. Use os botões abaixo para gerenciar seus dados.</p>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        <!-- Menu de Importação CSV -->
+                        <div class="relative inline-block text-left" id="dropdown-importar">
+                            <button onclick="toggleDropdown('dropdown-importar-menu')" type="button" class="bg-info text-white px-3 py-2 rounded hover:bg-info/90 flex items-center">
+                                <i class="fas fa-upload mr-2"></i> Importar CSV <i class="fas fa-chevron-down ml-2"></i>
+                            </button>
+                            <div id="dropdown-importar-menu" class="hidden absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10">
+                                <div class="py-1" role="menu" aria-orientation="vertical">
+                                    <label class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 cursor-pointer">
+                                        <input type="file" id="import-epis" accept=".csv" onchange="importarCSV(event, 'epis')" class="hidden">
+                                        Importar EPIs
+                                    </label>
+                                    <label class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 cursor-pointer">
+                                        <input type="file" id="import-entradas" accept=".csv" onchange="importarCSV(event, 'entradas')" class="hidden">
+                                        Importar Entradas
+                                    </label>
+                                    <label class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 cursor-pointer">
+                                        <input type="file" id="import-saidas" accept=".csv" onchange="importarCSV(event, 'saidas')" class="hidden">
+                                        Importar Saídas
+                                    </label>
+                                    <label class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 cursor-pointer">
+                                        <input type="file" id="import-centros" accept=".csv" onchange="importarCSV(event, 'centros')" class="hidden">
+                                        Importar Centros de Custo
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Menu de Exportação CSV - BOTÕES GRANDES -->
+                        <div class="flex flex-wrap gap-2">
+                            <button onclick="downloadCSVDireto('epis')" class="bg-warning text-white px-4 py-2 rounded hover:bg-warning/90 flex items-center">
+                                <i class="fas fa-download mr-2"></i> Download EPIs
+                            </button>
+                            <button onclick="downloadCSVDireto('entradas')" class="bg-warning text-white px-4 py-2 rounded hover:bg-warning/90 flex items-center">
+                                <i class="fas fa-download mr-2"></i> Download Entradas
+                            </button>
+                            <button onclick="downloadCSVDireto('saidas')" class="bg-warning text-white px-4 py-2 rounded hover:bg-warning/90 flex items-center">
+                                <i class="fas fa-download mr-2"></i> Download Saídas
+                            </button>
+                            <button onclick="downloadCSVDireto('centros')" class="bg-warning text-white px-4 py-2 rounded hover:bg-warning/90 flex items-center">
+                                <i class="fas fa-download mr-2"></i> Download Centros
+                            </button>
+                        </div>
+                        
+                        <!-- Templates CSV -->
+                        <div class="relative inline-block text-left" id="dropdown-templates">
+                            <button onclick="toggleDropdown('dropdown-templates-menu')" type="button" class="bg-success text-white px-3 py-2 rounded hover:bg-success/90 flex items-center">
+                                <i class="fas fa-file-csv mr-2"></i> Templates CSV <i class="fas fa-chevron-down ml-2"></i>
+                            </button>
+                            <div id="dropdown-templates-menu" class="hidden absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10">
+                                <div class="py-1" role="menu" aria-orientation="vertical">
+                                    <button onclick="baixarTemplate('epis')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900">
+                                        Template EPIs
+                                    </button>
+                                    <button onclick="baixarTemplate('entradas')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900">
+                                        Template Entradas
+                                    </button>
+                                    <button onclick="baixarTemplate('saidas')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900">
+                                        Template Saídas
+                                    </button>
+                                    <button onclick="baixarTemplate('centros')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900">
+                                        Template Centros de Custo
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Menu de Navegação -->
+            <div class="bg-white shadow rounded-lg mb-6 overflow-x-auto">
+                <div class="flex flex-wrap">
+                    <button id="tab-epis" onclick="mudarTab('epis')" class="px-4 py-3 font-medium border-b-2 border-primary text-primary">
+                        <i class="fas fa-hard-hat mr-2"></i>EPIs
+                    </button>
+                    <button id="tab-entradas" onclick="mudarTab('entradas')" class="px-4 py-3 font-medium text-gray-500 hover:text-primary">
+                        <i class="fas fa-arrow-right-to-bracket mr-2"></i>Entradas
+                    </button>
+                    <button id="tab-saidas" onclick="mudarTab('saidas')" class="px-4 py-3 font-medium text-gray-500 hover:text-primary">
+                        <i class="fas fa-arrow-right-from-bracket mr-2"></i>Saídas
+                    </button>
+                    <button id="tab-centros" onclick="mudarTab('centros')" class="px-4 py-3 font-medium text-gray-500 hover:text-primary">
+                        <i class="fas fa-sitemap mr-2"></i>Centros de Custo
+                    </button>
+                    <button id="tab-relatorios" onclick="mudarTab('relatorios')" class="px-4 py-3 font-medium text-gray-500 hover:text-primary">
+                        <i class="fas fa-chart-bar mr-2"></i>Relatórios
+                    </button>
+                </div>
+            </div>
+
+            <!-- Conteúdo da aba EPIs -->
+            <div id="conteudo-epis">
+                <!-- Barra de ações -->
+                <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+                    <div class="flex flex-col md:flex-row items-center gap-2 w-full md:w-auto">
+                        <input 
+                            type="text" 
+                            id="busca-epi" 
+                            placeholder="Buscar por nome ou código..." 
+                            class="border border-gray-300 rounded-lg px-4 py-2 w-full md:w-64 focus:outline-none focus:ring-2 focus:ring-primary"
+                        >
+                        <button 
+                            onclick="buscarEPIs()" 
+                            class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 w-full md:w-auto"
+                        >
+                            <i class="fas fa-search mr-2"></i>Buscar
+                        </button>
+                    </div>
+                    <button 
+                        onclick="abrirModalEPI()" 
+                        class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 flex items-center w-full md:w-auto justify-center"
+                    >
+                        <i class="fas fa-plus-circle mr-2"></i>Novo EPI
+                    </button>
+                </div>
+
+                <!-- Tabela de EPIs -->
+                <div class="bg-white rounded-lg shadow overflow-hidden">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nome</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Código</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Categoria</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estoque</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estoque Mínimo</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Custo</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200" id="tabela-epis">
+                            <!-- Dados serão inseridos via JavaScript -->
+                        </tbody>
+                    </table>
+                    <div id="sem-registros-epis" class="hidden p-8 text-center text-gray-500">
+                        Nenhum EPI cadastrado. Clique em "Novo EPI" para adicionar.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Conteúdo da aba Entradas -->
+            <div id="conteudo-entradas" class="hidden">
+                <!-- Barra de ações -->
+                <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+                    <div class="flex flex-col md:flex-row items-center gap-2 w-full md:w-auto">
+                        <select 
+                            id="filtro-entrada-epi" 
+                            class="border border-gray-300 rounded-lg px-4 py-2 w-full md:w-64 focus:outline-none focus:ring-2 focus:ring-primary"
+                        >
+                            <option value="">Todos os EPIs</option>
+                            <!-- Opções serão preenchidas via JavaScript -->
+                        </select>
+                        <button 
+                            onclick="filtrarEntradas()" 
+                            class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 w-full md:w-auto"
+                        >
+                            <i class="fas fa-filter mr-2"></i>Filtrar
+                        </button>
+                    </div>
+                    <button 
+                        onclick="abrirModalEntrada()" 
+                        class="bg-success text-white px-4 py-2 rounded-lg hover:bg-success/90 flex items-center w-full md:w-auto justify-center"
+                    >
+                        <i class="fas fa-plus-circle mr-2"></i>Nova Entrada
+                    </button>
+                </div>
+
+                <!-- Tabela de Entradas -->
+                <div class="bg-white rounded-lg shadow overflow-hidden">
+                    <div class="overflow-x-auto w-full">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">EPI</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Qtd</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Custo Unit.</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Valor Total</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nota Fiscal</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200" id="tabela-entradas">
+                                <!-- Dados serão inseridos via JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <div id="sem-registros-entradas" class="hidden p-8 text-center text-gray-500">
+                        Nenhuma entrada registrada. Clique em "Nova Entrada" para adicionar.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Conteúdo da aba Saídas -->
+            <div id="conteudo-saidas" class="hidden">
+                <!-- Barra de ações -->
+                <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+                    <div class="flex flex-col md:flex-row items-center gap-2 w-full md:w-auto">
+                        <select 
+                            id="filtro-saida-epi" 
+                            class="border border-gray-300 rounded-lg px-4 py-2 w-full md:w-64 focus:outline-none focus:ring-2 focus:ring-primary"
+                        >
+                            <option value="">Todos os EPIs</option>
+                            <!-- Opções serão preenchidas via JavaScript -->
+                        </select>
+                        <button 
+                            onclick="filtrarSaidas()" 
+                            class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 w-full md:w-auto"
+                        >
+                            <i class="fas fa-filter mr-2"></i>Filtrar
+                        </button>
+                    </div>
+                    <button 
+                        onclick="abrirModalSaida()" 
+                        class="bg-warning text-white px-4 py-2 rounded-lg hover:bg-warning/90 flex items-center w-full md:w-auto justify-center"
+                    >
+                        <i class="fas fa-minus-circle mr-2"></i>Nova Saída
+                    </button>
+                </div>
+
+                <!-- Tabela de Saídas -->
+                <div class="bg-white rounded-lg shadow overflow-hidden">
+                    <div class="overflow-x-auto w-full">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">EPI</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Qtd</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Destinatário</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Setor</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200" id="tabela-saidas">
+                                <!-- Dados serão inseridos via JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <div id="sem-registros-saidas" class="hidden p-8 text-center text-gray-500">
+                        Nenhuma saída registrada. Clique em "Nova Saída" para adicionar.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Conteúdo da aba Centros de Custo -->
+            <div id="conteudo-centros" class="hidden">
+                <!-- Barra de ações -->
+                <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+                    <div class="flex flex-col md:flex-row items-center gap-2 w-full md:w-auto">
+                        <input 
+                            type="text" 
+                            id="busca-centro" 
+                            placeholder="Buscar por contrato ou código..." 
+                            class="border border-gray-300 rounded-lg px-4 py-2 w-full md:w-64 focus:outline-none focus:ring-2 focus:ring-primary"
+                        >
+                        <button 
+                            onclick="buscarCentros()" 
+                            class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 w-full md:w-auto"
+                        >
+                            <i class="fas fa-search mr-2"></i>Buscar
+                        </button>
+                    </div>
+                    <button 
+                        onclick="abrirModalCentro()" 
+                        class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 flex items-center w-full md:w-auto justify-center"
+                    >
+                        <i class="fas fa-plus-circle mr-2"></i>Novo Centro de Custo
+                    </button>
+                </div>
+
+                <!-- Tabela de Centros de Custo -->
+                <div class="bg-white rounded-lg shadow overflow-hidden">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Código</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contrato</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Responsável</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Setor</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200" id="tabela-centros">
+                            <!-- Dados serão inseridos via JavaScript -->
+                        </tbody>
+                    </table>
+                    <div id="sem-registros-centros" class="hidden p-8 text-center text-gray-500">
+                        Nenhum centro de custo cadastrado. Clique em "Novo Centro de Custo" para adicionar.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Conteúdo da aba Relatórios -->
+            <div id="conteudo-relatorios" class="hidden">
+                <div class="mb-6">
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <h2 class="text-xl font-bold text-gray-800 mb-4">Relatório de Consumo de EPIs</h2>
+                        
+                        <!-- Filtros do relatório -->
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                            <div>
+                                <label for="relatorio-periodo-inicio" class="block text-sm font-medium text-gray-700 mb-1">
+                                    Período - Início
+                                </label>
+                                <input 
+                                    type="date" 
+                                    id="relatorio-periodo-inicio" 
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-md text-base focus:outline-none focus:ring-2 focus:ring-primary"
+                                >
+                            </div>
+                            <div>
+                                <label for="relatorio-periodo-fim" class="block text-sm font-medium text-gray-700 mb-1">
+                                    Período - Fim
+                                </label>
+                                <input 
+                                    type="date" 
+                                    id="relatorio-periodo-fim" 
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-md text-base focus:outline-none focus:ring-2 focus:ring-primary"
+                                >
+                            </div>
+                            <div>
+                                <label for="relatorio-categoria" class="block text-sm font-medium text-gray-700 mb-1">
+                                    Categoria de EPI
+                                </label>
+                                <select 
+                                    id="relatorio-categoria" 
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-md text-base focus:outline-none focus:ring-2 focus:ring-primary"
+                                >
+                                    <option value="">Todas as Categorias</option>
+                                    <option value="Capacetes">Capacetes</option>
+                                    <option value="Luvas">Luvas</option>
+                                    <option value="Óculos">Óculos</option>
+                                    <option value="Protetores Auditivos">Protetores Auditivos</option>
+                                    <option value="Respiradores">Respiradores</option>
+                                    <option value="Calçados">Calçados</option>
+                                    <option value="Outros">Outros</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="flex justify-end mb-6">
+                            <button 
+                                onclick="gerarRelatorio()" 
+                                class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90"
+                            >
+                                <i class="fas fa-chart-line mr-2"></i>Gerar Relatório
+                            </button>
+                        </div>
+                        
+                        <!-- Resultado do relatório -->
+                        <div id="relatorio-resultado" class="hidden">
+                            <div class="flex flex-col md:flex-row justify-between mb-4">
+                                <h3 class="text-lg font-bold text-gray-700" id="relatorio-titulo">Consumo de EPIs</h3>
+                                <div>
+                                    <button onclick="exportarRelatorioPDF()" class="bg-danger text-white px-3 py-1 rounded hover:bg-danger/90 text-sm mr-2">
+                                        <i class="fas fa-file-pdf mr-1"></i> PDF
+                                    </button>
+                                    <button onclick="exportarRelatorioExcel()" class="bg-success text-white px-3 py-1 rounded hover:bg-success/90 text-sm">
+                                        <i class="fas fa-file-excel mr-1"></i> Excel
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- Resumo -->
+                            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                                <div class="bg-blue-50 border-blue-200 border rounded-lg p-4">
+                                    <p class="text-sm text-blue-600">Total de Itens</p>
+                                    <p class="text-2xl font-bold text-blue-700" id="indicador-total-itens">0</p>
+                                </div>
+                                <div class="bg-green-50 border-green-200 border rounded-lg p-4">
+                                    <p class="text-sm text-green-600">Valor Total (R$)</p>
+                                    <p class="text-2xl font-bold text-green-700" id="indicador-valor-total">R$ 0,00</p>
+                                </div>
+                                <div class="bg-yellow-50 border-yellow-200 border rounded-lg p-4">
+                                    <p class="text-sm text-yellow-600">Maior Categoria</p>
+                                    <p class="text-xl font-bold text-yellow-700" id="indicador-maior-categoria">-</p>
+                                </div>
+                                <div class="bg-purple-50 border-purple-200 border rounded-lg p-4">
+                                    <p class="text-sm text-purple-600">EPI Mais Consumido</p>
+                                    <p class="text-xl font-bold text-purple-700" id="indicador-maior-epi">-</p>
+                                </div>
+                            </div>
+                            
+                            <!-- Tabela detalhada -->
+                            <div class="overflow-x-auto bg-white border rounded-lg">
+                                <table class="min-w-full divide-y divide-gray-200">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">EPI</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Categoria</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quantidade</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Valor Unitário</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Valor Total</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">% do Total</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="tabela-relatorio-consumo" class="bg-white divide-y divide-gray-200">
+                                        <!-- Dados serão inseridos via JavaScript -->
+                                    </tbody>
+                                    <tfoot class="bg-gray-50 font-semibold">
+                                        <tr>
+                                            <td colspan="2" class="px-6 py-3 text-right">Totais:</td>
+                                            <td id="total-quantidade" class="px-6 py-3">0</td>
+                                            <td class="px-6 py-3">-</td>
+                                            <td id="total-valor" class="px-6 py-3">R$ 0,00</td>
+                                            <td class="px-6 py-3">100%</td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modais diversos, mantidos do código original -->
+    <!-- Modal de Cadastro/Edição de EPI -->
+    <div id="modal-epi" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+        <div class="bg-white rounded-lg shadow-lg w-full max-w-2xl mx-4">
+            <div class="flex justify-between items-center p-4 border-b">
+                <h2 id="modal-titulo-epi" class="text-xl font-bold text-gray-800">Cadastrar Novo EPI</h2>
+                <button onclick="fecharModal('modal-epi')" class="text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <form id="form-epi" class="p-4">
+                <input type="hidden" id="epi-id">
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <!-- Nome -->
+                    <div>
+                        <label for="epi-nome" class="block text-sm font-medium text-gray-700 mb-1">
+                            Nome <span class="text-danger">*</span>
+                        </label>
+                        <input 
+                            type="text" 
+                            id="epi-nome" 
+                            required 
+                            placeholder="Ex: Capacete de Segurança" 
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md text-base"
+                        >
+                    </div>
+                    
+                    <!-- Código -->
+                    <div>
+                        <label for="epi-codigo" class="block text-sm font-medium text-gray-700 mb-1">
+                            Código
+                        </label>
+                        <input 
+                            type="text" 
+                            id="epi-codigo" 
+                            placeholder="Ex: CP001" 
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md text-base"
+                        >
+                    </div>
+                    
+                    <!-- Categoria -->
+                    <div>
+                        <label for="epi-categoria" class="block text-sm font-medium text-gray-700 mb-1">
+                            Categoria <span class="text-danger">*</span>
+                        </label>
+                        <select 
+                            id="epi-categoria" 
+                            required 
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md text-base"
+                        >
+                            <option value="">Selecione</option>
+                            <option value="Capacetes">Capacetes</option>
+                            <option value="Luvas">Luvas</option>
+                            <option value="Óculos">Óculos</option>
+                            <option value="Protetores Auditivos">Protetores Auditivos</option>
+                            <option value="Respiradores">Respiradores</option>
+                            <option value="Calçados">Calçados</option>
+                            <option value="Outros">Outros</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Unidade -->
+                    <div>
+                        <label for="epi-unidade" class="block text-sm font-medium text-gray-700 mb-1">
+                            Unidade <span class="text-danger">*</span>
+                        </label>
+                        <select 
+                            id="epi-unidade" 
+                            required 
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md text-base"
+                        >
+                            <option value="">Selecione</option>
+                            <option value="Unidade">Unidade</option>
+                            <option value="Par">Par</option>
+                            <option value="Caixa">Caixa</option>
+                            <option value="Pacote">Pacote</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Estoque -->
+                    <div>
+                        <label for="epi-estoque" class="block text-sm font-medium text-gray-700 mb-1">
+                            Estoque <span class="text-danger">*</span>
+                        </label>
+                        <input 
+                            type="number" 
+                            id="epi-estoque" 
+                            required 
+                            min="0" 
+                            value="0" 
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md text-base"
+                        >
+                    </div>
+                    
+                    <!-- Estoque Mínimo -->
+                    <div>
+                        <label for="epi-estoque-minimo" class="block text-sm font-medium text-gray-700 mb-1">
+                            Estoque Mínimo <span class="text-danger">*</span>
+                        </label>
+                        <input 
+                            type="number" 
+                            id="epi-estoque-minimo" 
+                            required 
+                            min="0" 
+                            value="0" 
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md text-base"
+                        >
+                    </div>
+                    
+                    <!-- Custo -->
+                    <div>
+                        <label for="epi-custo" class="block text-sm font-medium text-gray-700 mb-1">
+                            Custo (R$) <span class="text-danger">*</span>
+                        </label>
+                        <input 
+                            type="number" 
+                            id="epi-custo" 
+                            required 
+                            min="0" 
+                            step="0.01" 
+                            value="0.00" 
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md text-base"
+                        >
+                    </div>
+                    
+                    <!-- CA -->
+                    <div>
+                        <label for="epi-ca" class="block text-sm font-medium text-gray-700 mb-1">
+                            Número do CA
+                        </label>
+                        <input 
+                            type="text" 
+                            id="epi-ca" 
+                            placeholder="Ex: 12345" 
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md text-base"
+                        >
+                    </div>
+                </div>
+                
+                <div class="flex justify-end pt-4 border-t">
+                    <button 
+                        type="button" 
+                        onclick="fecharModal('modal-epi')" 
+                        class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 mr-2 hover:bg-gray-50"
+                    >
+                        Cancelar
+                    </button>
+                    <button 
+                        type="submit" 
+                        class="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90"
+                    >
+                        Salvar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal de Entrada de Estoque -->
+    <div id="modal-entrada" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+        <div class="bg-white rounded-lg shadow-lg w-full max-w-2xl mx-4">
+            <div class="flex justify-between items-center p-4 border-b">
+                <h2 class="text-xl font-bold text-gray-800">Registrar Entrada de Estoque</h2>
+                <button onclick="fecharModal('modal-entrada')" class="text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <form id="form-entrada" class="p-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <!-- Seleção de EPI -->
+                    <div class="md:col-span-2">
+                        <label for="entrada-epi" class="block text-sm font-medium text-gray-700 mb-1">
+                            EPI <span class="text-danger">*</span>
+                        </label>
+                        <select 
+                            id="entrada-epi" 
+                            required 
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md text-base"
+                        >
+                            <option value="">Selecione um EPI</option>
+                            <!-- Opções serão preenchidas via JavaScript -->
+                        </select>
+                    </div>
+                    
+                    <!-- Quantidade -->
+                    <div>
+                        <label for="entrada-quantidade" class="block text-sm font-medium text-gray-700 mb-1">
+                            Quantidade <span class="text-danger">*</span>
+                        </label>
+                        <input 
+                            type="number" 
+                            id="entrada-quantidade" 
+                            required 
+                            min="1" 
+                            value="1" 
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md text-base"
+                        >
+                    </div>
+                    
+                    <!-- Custo Unitário -->
+                    <div>
+                        <label for="entrada-custo" class="block text-sm font-medium text-gray-700 mb-1">
+                            Custo Unitário (R$) <span class="text-danger">*</span>
+                        </label>
+                        <input 
+                            type="number" 
+                            id="entrada-custo" 
+                            required 
+                            min="0" 
+                            step="0.01" 
+                            value="0.00" 
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md text-base"
+                        >
+                    </div>
+                    
+                    <!-- Data da Entrada -->
+                    <div>
+                        <label for="entrada-data" class="block text-sm font-medium text-gray-700 mb-1">
+                            Data <span class="text-danger">*</span>
+                        </label>
+                        <input 
+                            type="date" 
+                            id="entrada-data" 
+                            required 
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md text-base"
+                        >
+                    </div>
+                    
+                    <!-- Nota Fiscal -->
+                    <div>
+                        <label for="entrada-nota-fiscal" class="block text-sm font-medium text-gray-700 mb-1">
+                            Nota Fiscal
+                        </label>
+                        <input 
+                            type="text" 
+                            id="entrada-nota-fiscal" 
+                            placeholder="Ex: NF-e 12345" 
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md text-base"
+                        >
+                    </div>
+                </div>
+                
+                <div class="flex justify-end pt-4 border-t">
+                    <button 
+                        type="button" 
+                        onclick="fecharModal('modal-entrada')" 
+                        class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 mr-2 hover:bg-gray-50"
+                    >
+                        Cancelar
+                    </button>
+                    <button 
+                        type="submit" 
+                        class="px-4 py-2 bg-success text-white rounded-md hover:bg-success/90"
+                    >
+                        Registrar Entrada
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal de Saída de Estoque -->
+    <div id="modal-saida" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+        <div class="bg-white rounded-lg shadow-lg w-full max-w-2xl mx-4">
+            <div class="flex justify-between items-center p-4 border-b">
+                <h2 class="text-xl font-bold text-gray-800">Registrar Saída de Estoque</h2>
+                <button onclick="fecharModal('modal-saida')" class="text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <form id="form-saida" class="p-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <!-- Seleção de EPI -->
+                    <div class="md:col-span-2">
+                        <label for="saida-epi" class="block text-sm font-medium text-gray-700 mb-1">
+                            EPI <span class="text-danger">*</span>
+                        </label>
+                        <select 
+                            id="saida-epi" 
+                            required 
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md text-base"
+                        >
+                            <option value="">Selecione um EPI</option>
+                            <!-- Opções serão preenchidas via JavaScript -->
+                        </select>
+                    </div>
+                    
+                    <!-- Quantidade -->
+                    <div>
+                        <label for="saida-quantidade" class="block text-sm font-medium text-gray-700 mb-1">
+                            Quantidade <span class="text-danger">*</span>
+                        </label>
+                        <input 
+                            type="number" 
+                            id="saida-quantidade" 
+                            required 
+                            min="1" 
+                            value="1" 
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md text-base"
+                        >
+                    </div>
+                    
+                    <!-- Data da Saída -->
+                    <div>
+                        <label for="saida-data" class="block text-sm font-medium text-gray-700 mb-1">
+                            Data <span class="text-danger">*</span>
+                        </label>
+                        <input 
+                            type="date" 
+                            id="saida-data" 
+                            required 
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md text-base"
+                        >
+                    </div>
+                    
+                    <!-- Destinatário -->
+                    <div>
+                        <label for="saida-destinatario" class="block text-sm font-medium text-gray-700 mb-1">
+                            Destinatário <span class="text-danger">*</span>
+                        </label>
+                        <input 
+                            type="text" 
+                            id="saida-destinatario" 
+                            required 
+                            placeholder="Ex: João Silva" 
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md text-base"
+                        >
+                    </div>
+                    
+                    <!-- Setor -->
+                    <div>
+                        <label for="saida-setor" class="block text-sm font-medium text-gray-700 mb-1">
+                            Setor <span class="text-danger">*</span>
+                        </label>
+                        <input 
+                            type="text" 
+                            id="saida-setor" 
+                            required 
+                            placeholder="Ex: Produção" 
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md text-base"
+                        >
+                    </div>
+                </div>
+                
+                <div class="flex justify-end pt-4 border-t">
+                    <button 
+                        type="button" 
+                        onclick="fecharModal('modal-saida')" 
+                        class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 mr-2 hover:bg-gray-50"
+                    >
+                        Cancelar
+                    </button>
+                    <button 
+                        type="submit" 
+                        class="px-4 py-2 bg-warning text-white rounded-md hover:bg-warning/90"
+                    >
+                        Registrar Saída
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal de Cadastro/Edição de Centro de Custo -->
+    <div id="modal-centro" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+        <div class="bg-white rounded-lg shadow-lg w-full max-w-2xl mx-4">
+            <div class="flex justify-between items-center p-4 border-b">
+                <h2 id="modal-titulo-centro" class="text-xl font-bold text-gray-800">Cadastrar Novo Centro de Custo</h2>
+                <button onclick="fecharModal('modal-centro')" class="text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <form id="form-centro" class="p-4">
+                <input type="hidden" id="centro-id">
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <!-- Código -->
+                    <div>
+                        <label for="centro-codigo" class="block text-sm font-medium text-gray-700 mb-1">
+                            Código <span class="text-danger">*</span>
+                        </label>
+                        <input 
+                            type="text" 
+                            id="centro-codigo" 
+                            required 
+                            placeholder="Ex: CC001" 
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md text-base"
+                        >
+                    </div>
+                    
+                    <!-- Contrato -->
+                    <div>
+                        <label for="centro-nome" class="block text-sm font-medium text-gray-700 mb-1">
+                            Contrato <span class="text-danger">*</span>
+                        </label>
+                        <input 
+                            type="text" 
+                            id="centro-nome" 
+                            required 
+                            placeholder="Ex: Construção Ponte Rio-Niterói" 
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md text-base"
+                        >
+                    </div>
+                    
+                    <!-- Responsável -->
+                    <div>
+                        <label for="centro-responsavel" class="block text-sm font-medium text-gray-700 mb-1">
+                            Responsável <span class="text-danger">*</span>
+                        </label>
+                        <input 
+                            type="text" 
+                            id="centro-responsavel" 
+                            required 
+                            placeholder="Ex: João Silva" 
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md text-base"
+                        >
+                    </div>
+                    
+                    <!-- Setor -->
+                    <div>
+                        <label for="centro-departamento" class="block text-sm font-medium text-gray-700 mb-1">
+                            Setor <span class="text-danger">*</span>
+                        </label>
+                        <input 
+                            type="text" 
+                            id="centro-departamento" 
+                            required 
+                            placeholder="Ex: Operacional" 
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md text-base"
+                        >
+                    </div>
+                    
+                    <!-- Status -->
+                    <div>
+                        <label for="centro-status" class="block text-sm font-medium text-gray-700 mb-1">
+                            Status <span class="text-danger">*</span>
+                        </label>
+                        <select 
+                            id="centro-status" 
+                            required 
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md text-base"
+                        >
+                            <option value="Ativo">Ativo</option>
+                            <option value="Inativo">Inativo</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- Observações -->
+                <div class="mb-4">
+                    <label for="centro-observacoes" class="block text-sm font-medium text-gray-700 mb-1">
+                        Observações
+                    </label>
+                    <textarea 
+                        id="centro-observacoes" 
+                        rows="3" 
+                        placeholder="Informações adicionais sobre o centro de custo..." 
+                        class="w-full px-3 py-2 border border-gray-300 rounded-md text-base"
+                    ></textarea>
+                </div>
+                
+                <div class="flex justify-end pt-4 border-t">
+                    <button 
+                        type="button" 
+                        onclick="fecharModal('modal-centro')" 
+                        class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 mr-2 hover:bg-gray-50"
+                    >
+                        Cancelar
+                    </button>
+                    <button 
+                        type="submit" 
+                        class="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90"
+                    >
+                        Salvar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal de Importação/Exportação -->
+    <div id="modal-importacao" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+        <div class="bg-white rounded-lg shadow-lg w-full max-w-2xl mx-4">
+            <div class="flex justify-between items-center p-4 border-b">
+                <h2 id="modal-importacao-titulo" class="text-xl font-bold text-gray-800">Importação de Dados</h2>
+                <button onclick="fecharModal('modal-importacao')" class="text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            
+            <div class="p-4">
+                <div id="importacao-conteudo" class="mb-4">
+                    <!-- Conteúdo será preenchido dinamicamente -->
+                </div>
+                
+                <div id="importacao-progresso" class="hidden">
+                    <p class="text-sm text-gray-600 mb-2">Processando dados...</p>
+                    <div class="h-2 bg-gray-200 rounded-full overflow-hidden">
+                        <div id="importacao-barra" class="h-full bg-primary" style="width: 0%"></div>
+                    </div>
+                </div>
+                
+                <div id="importacao-resultado" class="hidden mt-4">
+                    <!-- Resultado será preenchido dinamicamente -->
+                </div>
+                
+                <div class="flex justify-end pt-4 border-t mt-4">
+                    <button 
+                        type="button" 
+                        onclick="fecharModal('modal-importacao')" 
+                        class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 mr-2 hover:bg-gray-50"
+                    >
+                        Fechar
+                    </button>
+                    <button 
+                        type="button"
+                        id="importacao-confirmar" 
+                        class="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 hidden"
+                    >
+                        Confirmar Importação
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- NOVO MODAL: Modal de Confirmação de Exclusão -->
+    <div id="modal-confirmacao" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+        <div class="bg-white rounded-lg shadow-lg w-full max-w-md mx-4">
+            <div class="flex justify-between items-center p-4 border-b">
+                <h2 class="text-xl font-bold text-gray-800">Confirmar Exclusão</h2>
+                <button onclick="fecharModal('modal-confirmacao')" class="text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <div class="p-6">
+                <p id="confirmacao-mensagem" class="text-gray-700 mb-6">Tem certeza que deseja excluir este item?</p>
+                
+                <div class="flex justify-end gap-3">
+                    <button 
+                        onclick="fecharModal('modal-confirmacao')" 
+                        class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                    >
+                        Cancelar
+                    </button>
+                    <button 
+                        id="confirmacao-confirmar" 
+                        class="px-4 py-2 bg-danger text-white rounded-md hover:bg-danger/90"
+                    >
+                        Confirmar Exclusão
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast de notificação -->
+    <div id="toast" class="fixed bottom-4 right-4 p-4 rounded-lg shadow-lg transition-all duration-300 transform translate-y-20 opacity-0">
+        <div class="flex items-center">
+            <i id="toast-icon" class="mr-2"></i>
+            <span id="toast-mensagem"></span>
+        </div>
+    </div>
+
+    <script>
+        // Dados para exemplo
+        let listaEPIs = [];
+        let listaEntradas = [];
+        let listaSaidas = [];
+        let listaCentros = [];
+        
+        // Usuários para login
+        const usuarios = [
+            { nome: 'Administrador', login: 'admin', senha: 'admin123' },
+            { nome: 'Operador', login: 'operador', senha: 'operador123' }
+        ];
+        
+        // Variável para usuário atual
+        let usuarioAtual = null;
+        
+        // Quando a página carrega
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log("Inicializando sistema (Corrigido)...");
+            
+            // Configurar formulário de login
+            document.getElementById('form-login').addEventListener('submit', function(e) {
+                e.preventDefault();
+                fazerLogin();
+            });
+            
+            // Configurar formulário de EPI
+            document.getElementById('form-epi').addEventListener('submit', function(e) {
+                e.preventDefault();
+                salvarEPI();
+            });
+            
+            // Configurar formulário de Entrada
+            document.getElementById('form-entrada').addEventListener('submit', function(e) {
+                e.preventDefault();
+                salvarEntrada();
+            });
+            
+            // Configurar formulário de Saída
+            document.getElementById('form-saida').addEventListener('submit', function(e) {
+                e.preventDefault();
+                salvarSaida();
+            });
+            
+            // Configurar formulário de Centro de Custo
+            document.getElementById('form-centro').addEventListener('submit', function(e) {
+                e.preventDefault();
+                salvarCentro();
+            });
+            
+            // Configurar cliques fora dos dropdowns
+            document.addEventListener('click', function(event) {
+                const dropdowns = document.querySelectorAll('[id^="dropdown-"][id$="-menu"]');
+                dropdowns.forEach(dropdown => {
+                    if (!dropdown.parentNode.contains(event.target)) {
+                        dropdown.classList.add('hidden');
+                    }
+                });
+            });
+            
+            // Definir data atual nos formulários
+            const dataHoje = new Date().toISOString().split('T')[0];
+            
+            if (document.getElementById('entrada-data')) {
+                document.getElementById('entrada-data').value = dataHoje;
+            }
+            
+            if (document.getElementById('saida-data')) {
+                document.getElementById('saida-data').value = dataHoje;
+            }
+            
+            console.log("Sistema inicializado com sucesso");
+        });
+        
+        // Função de login
+        function fazerLogin() {
+            const login = document.getElementById('usuario').value;
+            const senha = document.getElementById('senha').value;
+            const erro = document.getElementById('erro-login');
+            
+            const usuario = usuarios.find(u => u.login === login && u.senha === senha);
+            
+            if (usuario) {
+                usuarioAtual = usuario;
+                document.getElementById('usuario-logado').textContent = usuario.nome;
+                document.getElementById('tela-login').classList.add('hidden');
+                document.getElementById('tela-principal').classList.remove('hidden');
+                
+                // Inicializar a primeira aba
+                mudarTab('epis');
+                mostrarToast(`Bem-vindo, ${usuario.nome}!`, 'sucesso');
+            } else {
+                erro.textContent = 'Usuário ou senha inválidos.';
+                erro.classList.remove('hidden');
+            }
+        }
+        
+        // Função de logout
+        function logout() {
+            usuarioAtual = null;
+            document.getElementById('tela-principal').classList.add('hidden');
+            document.getElementById('tela-login').classList.remove('hidden');
+            document.getElementById('usuario').value = '';
+            document.getElementById('senha').value = '';
+            document.getElementById('erro-login').classList.add('hidden');
+        }
+        
+        // Função para alternar dropdowns
+        function toggleDropdown(id) {
+            // Fechar todos os outros dropdowns
+            const dropdowns = document.querySelectorAll('[id^="dropdown-"][id$="-menu"]');
+            dropdowns.forEach(dropdown => {
+                if (dropdown.id !== id) {
+                    dropdown.classList.add('hidden');
+                }
+            });
+            
+            // Alternar o dropdown selecionado
+            const dropdown = document.getElementById(id);
+            dropdown.classList.toggle('hidden');
+        }
+        
+        // Formatar valor monetário
+        function formatarMoeda(valor) {
+            return 'R$ ' + parseFloat(valor).toFixed(2).replace('.', ',');
+        }
+        
+        // Formatar data
+        function formatarData(data) {
+            if (!data) return '';
+            const partes = data.split('-');
+            if (partes.length !== 3) return data;
+            return `${partes[2]}/${partes[1]}/${partes[0]}`;
+        }
+        
+        // Mostrar toast de notificação
+        function mostrarToast(mensagem, tipo) {
+            const toast = document.getElementById('toast');
+            const toastIcon = document.getElementById('toast-icon');
+            const toastMensagem = document.getElementById('toast-mensagem');
+            
+            if (tipo === 'sucesso') {
+                toast.className = 'fixed bottom-4 right-4 p-4 rounded-lg shadow-lg bg-success text-white transition-all duration-300 transform';
+                toastIcon.className = 'fas fa-check-circle mr-2';
+            } else if (tipo === 'erro') {
+                toast.className = 'fixed bottom-4 right-4 p-4 rounded-lg shadow-lg bg-danger text-white transition-all duration-300 transform';
+                toastIcon.className = 'fas fa-exclamation-circle mr-2';
+            } else if (tipo === 'aviso') {
+                toast.className = 'fixed bottom-4 right-4 p-4 rounded-lg shadow-lg bg-warning text-white transition-all duration-300 transform';
+                toastIcon.className = 'fas fa-exclamation-triangle mr-2';
+            } else {
+                toast.className = 'fixed bottom-4 right-4 p-4 rounded-lg shadow-lg bg-info text-white transition-all duration-300 transform';
+                toastIcon.className = 'fas fa-info-circle mr-2';
+            }
+            
+            toastMensagem.textContent = mensagem;
+            
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+        
+        // Funções para manipulação de modais
+        function abrirModal(id) {
+            document.getElementById(id).classList.remove('hidden');
+        }
+        
+        function fecharModal(id) {
+            document.getElementById(id).classList.add('hidden');
+        }
+        
+        // NOVA FUNÇÃO: Confirmação de exclusão
+        let callbackExclusao = null;
+        let dadosExclusao = null;
+
+        function confirmarExclusao(mensagem, callback, dados) {
+            // Definir a mensagem de confirmação
+            document.getElementById('confirmacao-mensagem').textContent = mensagem;
+            
+            // Armazenar o callback e os dados para uso posterior
+            callbackExclusao = callback;
+            dadosExclusao = dados;
+            
+            // Configurar o botão de confirmação
+            document.getElementById('confirmacao-confirmar').onclick = function() {
+                // Executar o callback com os dados
+                if (callbackExclusao && dadosExclusao !== null) {
+                    callbackExclusao(dadosExclusao);
+                }
+                
+                // Fechar o modal
+                fecharModal('modal-confirmacao');
+            };
+            
+            // Mostrar o modal
+            abrirModal('modal-confirmacao');
+        }
+        
+        // Função para mudar abas
+        function mudarTab(tab) {
+            document.getElementById('conteudo-epis').classList.add('hidden');
+            document.getElementById('conteudo-entradas').classList.add('hidden');
+            document.getElementById('conteudo-saidas').classList.add('hidden');
+            document.getElementById('conteudo-centros').classList.add('hidden');
+            
+            // Adicionar a aba de relatórios
+            if (document.getElementById('conteudo-relatorios')) {
+                document.getElementById('conteudo-relatorios').classList.add('hidden');
+            }
+            
+            document.getElementById('tab-epis').classList.remove('border-b-2', 'border-primary', 'text-primary');
+            document.getElementById('tab-entradas').classList.remove('border-b-2', 'border-primary', 'text-primary');
+            document.getElementById('tab-saidas').classList.remove('border-b-2', 'border-primary', 'text-primary');
+            document.getElementById('tab-centros').classList.remove('border-b-2', 'border-primary', 'text-primary');
+            
+            // Adicionar a aba de relatórios
+            if (document.getElementById('tab-relatorios')) {
+                document.getElementById('tab-relatorios').classList.remove('border-b-2', 'border-primary', 'text-primary');
+            }
+            
+            document.getElementById('tab-epis').classList.add('text-gray-500');
+            document.getElementById('tab-entradas').classList.add('text-gray-500');
+            document.getElementById('tab-saidas').classList.add('text-gray-500');
+            document.getElementById('tab-centros').classList.add('text-gray-500');
+            
+            // Adicionar a aba de relatórios
+            if (document.getElementById('tab-relatorios')) {
+                document.getElementById('tab-relatorios').classList.add('text-gray-500');
+            }
+            
+            document.getElementById(`conteudo-${tab}`).classList.remove('hidden');
+            document.getElementById(`tab-${tab}`).classList.remove('text-gray-500');
+            document.getElementById(`tab-${tab}`).classList.add('border-b-2', 'border-primary', 'text-primary');
+            
+            if (tab === 'epis') {
+                carregarTabelaEPIs();
+            } else if (tab === 'entradas') {
+                carregarTabelaEntradas();
+                carregarSelectEPIs('entrada-epi');
+                carregarSelectEPIs('filtro-entrada-epi');
+            } else if (tab === 'saidas') {
+                carregarTabelaSaidas();
+                carregarSelectEPIs('saida-epi');
+                carregarSelectEPIs('filtro-saida-epi');
+            } else if (tab === 'centros') {
+                carregarTabelaCentros();
+            } else if (tab === 'relatorios') {
+                inicializarRelatorios();
+            }
+        }
+        
+        // FUNÇÕES PARA EPIs
+        
+        function abrirModalEPI() {
+            document.getElementById('modal-titulo-epi').textContent = 'Cadastrar Novo EPI';
+            document.getElementById('form-epi').reset();
+            document.getElementById('epi-id').value = '';
+            abrirModal('modal-epi');
+        }
+        
+        function salvarEPI() {
+            const id = document.getElementById('epi-id').value;
+            const epi = {
+                nome: document.getElementById('epi-nome').value,
+                codigo: document.getElementById('epi-codigo').value,
+                categoria: document.getElementById('epi-categoria').value,
+                unidade: document.getElementById('epi-unidade').value,
+                estoque: parseInt(document.getElementById('epi-estoque').value),
+                estoqueMinimo: parseInt(document.getElementById('epi-estoque-minimo').value),
+                custo: parseFloat(document.getElementById('epi-custo').value),
+                ca: document.getElementById('epi-ca').value
+            };
+            
+            if (id) {
+                // Edição
+                epi.id = parseInt(id);
+                const index = listaEPIs.findIndex(item => item.id === epi.id);
+                if (index !== -1) {
+                    listaEPIs[index] = epi;
+                    mostrarToast('EPI atualizado com sucesso!', 'sucesso');
+                }
+            } else {
+                // Novo cadastro
+                epi.id = listaEPIs.length > 0 ? Math.max(...listaEPIs.map(item => item.id)) + 1 : 1;
+                listaEPIs.push(epi);
+                mostrarToast('EPI cadastrado com sucesso!', 'sucesso');
+            }
+            
+            carregarTabelaEPIs();
+            fecharModal('modal-epi');
+        }
+        
+        function carregarTabelaEPIs() {
+            const tabela = document.getElementById('tabela-epis');
+            const semRegistros = document.getElementById('sem-registros-epis');
+            
+            tabela.innerHTML = '';
+            
+            if (listaEPIs.length === 0) {
+                tabela.parentElement.classList.add('hidden');
+                semRegistros.classList.remove('hidden');
+                return;
+            }
+            
+            tabela.parentElement.classList.remove('hidden');
+            semRegistros.classList.add('hidden');
+            
+            listaEPIs.forEach(epi => {
+                const tr = document.createElement('tr');
+                const estoqueClass = epi.estoque < epi.estoqueMinimo ? 'text-danger font-medium' : '';
+                
+                tr.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">${epi.nome}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">${epi.codigo || '-'}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">${epi.categoria}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm ${estoqueClass}">${epi.estoque}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">${epi.estoqueMinimo}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">${formatarMoeda(epi.custo)}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                        <button 
+                            onclick="editarEPI(${epi.id})" 
+                            class="text-primary hover:text-primary/80 mr-2" 
+                            title="Editar"
+                        >
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button 
+                            onclick="excluirEPI(${epi.id})" 
+                            class="text-danger hover:text-danger/80" 
+                            title="Excluir"
+                        >
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    </td>
+                `;
+                
+                tabela.appendChild(tr);
+            });
+        }
+        
+        function editarEPI(id) {
+            const epi = listaEPIs.find(e => e.id === id);
+            if (!epi) return;
+            
+            document.getElementById('modal-titulo-epi').textContent = 'Editar EPI';
+            document.getElementById('epi-id').value = epi.id;
+            document.getElementById('epi-nome').value = epi.nome;
+            document.getElementById('epi-codigo').value = epi.codigo || '';
+            document.getElementById('epi-categoria').value = epi.categoria;
+            document.getElementById('epi-unidade').value = epi.unidade;
+            document.getElementById('epi-estoque').value = epi.estoque;
+            document.getElementById('epi-estoque-minimo').value = epi.estoqueMinimo;
+            document.getElementById('epi-custo').value = epi.custo;
+            document.getElementById('epi-ca').value = epi.ca || '';
+            
+            abrirModal('modal-epi');
+        }
+        
+        // FUNÇÃO ATUALIZADA: Excluir EPI com novo modal de confirmação
+        function excluirEPI(id) {
+            confirmarExclusao(
+                'Tem certeza que deseja excluir este EPI?', 
+                function(idEPI) {
+                    // Verificar se há entradas ou saídas vinculadas
+                    const temEntradas = listaEntradas.some(entrada => entrada.epiId === idEPI);
+                    const temSaidas = listaSaidas.some(saida => saida.epiId === idEPI);
+                    
+                    if (temEntradas || temSaidas) {
+                        mostrarToast('Não é possível excluir este EPI pois existem movimentações vinculadas a ele.', 'erro');
+                        return;
+                    }
+                    
+                    listaEPIs = listaEPIs.filter(epi => epi.id !== idEPI);
+                    carregarTabelaEPIs();
+                    mostrarToast('EPI excluído com sucesso!', 'sucesso');
+                },
+                id
+            );
+        }
+        
+        function buscarEPIs() {
+            const textoBusca = document.getElementById('busca-epi').value.toLowerCase();
+            
+            if (!textoBusca) {
+                carregarTabelaEPIs();
+                return;
+            }
+            
+            const resultado = listaEPIs.filter(epi => 
+                epi.nome.toLowerCase().includes(textoBusca) || 
+                (epi.codigo && epi.codigo.toLowerCase().includes(textoBusca))
+            );
+            
+            carregarTabelaEPIs(resultado);
+            
+            if (resultado.length === 0) {
+                mostrarToast('Nenhum EPI encontrado com o termo buscado.', 'info');
+            }
+        }
+        
+        // FUNÇÕES PARA ENTRADA
+        
+        function carregarSelectEPIs(elementId) {
+            const select = document.getElementById(elementId);
+            if (!select) return;
+            
+            while (select.options.length > 1) {
+                select.remove(1);
+            }
+            
+            listaEPIs.forEach(epi => {
+                const option = document.createElement('option');
+                option.value = epi.id;
+                option.textContent = epi.nome;
+                select.appendChild(option);
+            });
+        }
+        
+        function abrirModalEntrada() {
+            document.getElementById('form-entrada').reset();
+            
+            const hoje = new Date().toISOString().split('T')[0];
+            document.getElementById('entrada-data').value = hoje;
+            
+            carregarSelectEPIs('entrada-epi');
+            
+            abrirModal('modal-entrada');
+        }
+        
+        function salvarEntrada() {
+            const epiId = parseInt(document.getElementById('entrada-epi').value);
+            const quantidade = parseInt(document.getElementById('entrada-quantidade').value);
+            const custo = parseFloat(document.getElementById('entrada-custo').value);
+            const data = document.getElementById('entrada-data').value;
+            const notaFiscal = document.getElementById('entrada-nota-fiscal').value;
+            
+            // Validação básica
+            if (!epiId) {
+                mostrarToast('Selecione um EPI', 'erro');
+                return;
+            }
+            
+            if (quantidade <= 0) {
+                mostrarToast('A quantidade deve ser maior que zero', 'erro');
+                return;
+            }
+            
+            // Criar objeto da entrada
+            const entrada = {
+                id: listaEntradas.length > 0 ? Math.max(...listaEntradas.map(e => e.id)) + 1 : 1,
+                epiId,
+                data,
+                quantidade,
+                custo,
+                notaFiscal
+            };
+            
+            // Adicionar à lista
+            listaEntradas.push(entrada);
+            
+            // Atualizar estoque do EPI
+            const epi = listaEPIs.find(e => e.id === epiId);
+            if (epi) {
+                epi.estoque += quantidade;
+            }
+            
+            // Fechar modal e mostrar mensagem
+            fecharModal('modal-entrada');
+            mostrarToast('Entrada registrada com sucesso!', 'sucesso');
+            
+            // Atualizar tabela
+            carregarTabelaEntradas();
+        }
+        
+        function carregarTabelaEntradas() {
+            const tabela = document.getElementById('tabela-entradas');
+            const semRegistros = document.getElementById('sem-registros-entradas');
+            
+            tabela.innerHTML = '';
+            
+            if (listaEntradas.length === 0) {
+                tabela.parentElement.parentElement.classList.add('hidden');
+                semRegistros.classList.remove('hidden');
+                return;
+            }
+            
+            tabela.parentElement.parentElement.classList.remove('hidden');
+            semRegistros.classList.add('hidden');
+            
+            listaEntradas.forEach(entrada => {
+                const epi = listaEPIs.find(e => e.id === entrada.epiId) || { nome: 'EPI não encontrado' };
+                const tr = document.createElement('tr');
+                
+                tr.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">${formatarData(entrada.data)}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">${epi.nome}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">${entrada.quantidade}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">${formatarMoeda(entrada.custo)}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">${formatarMoeda(entrada.quantidade * entrada.custo)}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">${entrada.notaFiscal || '-'}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                        <button 
+                            onclick="excluirEntrada(${entrada.id})" 
+                            class="text-danger hover:text-danger/80" 
+                            title="Excluir"
+                        >
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    </td>
+                `;
+                
+                tabela.appendChild(tr);
+            });
+        }
+        
+        // FUNÇÃO ATUALIZADA: Excluir Entrada com novo modal de confirmação
+        function excluirEntrada(id) {
+            confirmarExclusao(
+                'Tem certeza que deseja excluir esta entrada?',
+                function(idEntrada) {
+                    const entrada = listaEntradas.find(e => e.id === idEntrada);
+                    if (!entrada) return;
+                    
+                    // Encontrar o EPI para ajustar o estoque
+                    const epi = listaEPIs.find(e => e.id === entrada.epiId);
+                    if (epi) {
+                        // Reduzir o estoque
+                        epi.estoque -= entrada.quantidade;
+                        
+                        // Se o estoque ficar negativo, ajustar para zero
+                        if (epi.estoque < 0) {
+                            epi.estoque = 0;
+                            mostrarToast('Estoque ajustado para zero', 'aviso');
+                        }
+                    }
+                    
+                    // Remover a entrada
+                    listaEntradas = listaEntradas.filter(e => e.id !== idEntrada);
+                    carregarTabelaEntradas();
+                    mostrarToast('Entrada excluída com sucesso!', 'sucesso');
+                },
+                id
+            );
+        }
+        
+        function filtrarEntradas() {
+            const epiId = document.getElementById('filtro-entrada-epi').value;
+            
+            if (!epiId) {
+                carregarTabelaEntradas();
+                return;
+            }
+            
+            const resultado = listaEntradas.filter(entrada => entrada.epiId == epiId);
+            
+            carregarTabelaEntradas(resultado);
+            
+            if (resultado.length === 0) {
+                mostrarToast('Nenhuma entrada encontrada para este EPI.', 'info');
+            }
+        }
+        
+        // FUNÇÕES PARA SAÍDAS
+        
+        function abrirModalSaida() {
+            document.getElementById('form-saida').reset();
+            
+            const hoje = new Date().toISOString().split('T')[0];
+            document.getElementById('saida-data').value = hoje;
+            
+            carregarSelectEPIs('saida-epi');
+            
+            abrirModal('modal-saida');
+        }
+        
+        function salvarSaida() {
+            const epiId = parseInt(document.getElementById('saida-epi').value);
+            const quantidade = parseInt(document.getElementById('saida-quantidade').value);
+            const data = document.getElementById('saida-data').value;
+            const destinatario = document.getElementById('saida-destinatario').value;
+            const setor = document.getElementById('saida-setor').value;
+            
+            // Validação básica
+            if (!epiId) {
+                mostrarToast('Selecione um EPI', 'erro');
+                return;
+            }
+            
+            if (quantidade <= 0) {
+                mostrarToast('A quantidade deve ser maior que zero', 'erro');
+                return;
+            }
+            
+            // Verificar se há estoque suficiente
+            const epi = listaEPIs.find(e => e.id === epiId);
+            if (!epi) {
+                mostrarToast('EPI não encontrado', 'erro');
+                return;
+            }
+            
+            if (epi.estoque < quantidade) {
+                mostrarToast(`Estoque insuficiente. Disponível: ${epi.estoque}`, 'erro');
+                return;
+            }
+            
+            // Criar objeto da saída
+            const saida = {
+                id: listaSaidas.length > 0 ? Math.max(...listaSaidas.map(s => s.id)) + 1 : 1,
+                epiId,
+                data,
+                quantidade,
+                destinatario,
+                setor
+            };
+            
+            // Adicionar à lista
+            listaSaidas.push(saida);
+            
+            // Atualizar estoque do EPI
+            epi.estoque -= quantidade;
+            
+            // Fechar modal e mostrar mensagem
+            fecharModal('modal-saida');
+            mostrarToast('Saída registrada com sucesso!', 'sucesso');
+            
+            // Atualizar tabela
+            carregarTabelaSaidas();
+        }
+        
+        function carregarTabelaSaidas() {
+            const tabela = document.getElementById('tabela-saidas');
+            const semRegistros = document.getElementById('sem-registros-saidas');
+            
+            tabela.innerHTML = '';
+            
+            if (listaSaidas.length === 0) {
+                tabela.parentElement.parentElement.classList.add('hidden');
+                semRegistros.classList.remove('hidden');
+                return;
+            }
+            
+            tabela.parentElement.parentElement.classList.remove('hidden');
+            semRegistros.classList.add('hidden');
+            
+            listaSaidas.forEach(saida => {
+                const epi = listaEPIs.find(e => e.id === saida.epiId) || { nome: 'EPI não encontrado' };
+                const tr = document.createElement('tr');
+                
+                tr.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">${formatarData(saida.data)}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">${epi.nome}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">${saida.quantidade}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">${saida.destinatario}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">${saida.setor}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                        <button 
+                            onclick="excluirSaida(${saida.id})" 
+                            class="text-danger hover:text-danger/80" 
+                            title="Excluir"
+                        >
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    </td>
+                `;
+                
+                tabela.appendChild(tr);
+            });
+        }
+        
+        // FUNÇÃO ATUALIZADA: Excluir Saída com novo modal de confirmação
+        function excluirSaida(id) {
+            confirmarExclusao(
+                'Tem certeza que deseja excluir esta saída?',
+                function(idSaida) {
+                    const saida = listaSaidas.find(s => s.id === idSaida);
+                    if (!saida) return;
+                    
+                    // Encontrar o EPI para ajustar o estoque
+                    const epi = listaEPIs.find(e => e.id === saida.epiId);
+                    if (epi) {
+                        // Devolver a quantidade ao estoque
+                        epi.estoque += saida.quantidade;
+                    }
+                    
+                    // Remover a saída
+                    listaSaidas = listaSaidas.filter(s => s.id !== idSaida);
+                    carregarTabelaSaidas();
+                    mostrarToast('Saída excluída com sucesso!', 'sucesso');
+                },
+                id
+            );
+        }
+        
+        function filtrarSaidas() {
+            const epiId = document.getElementById('filtro-saida-epi').value;
+            
+            if (!epiId) {
+                carregarTabelaSaidas();
+                return;
+            }
+            
+            const resultado = listaSaidas.filter(saida => saida.epiId == epiId);
+            
+            carregarTabelaSaidas(resultado);
+            
+            if (resultado.length === 0) {
+                mostrarToast('Nenhuma saída encontrada para este EPI.', 'info');
+            }
+        }
+        
+        // FUNÇÕES PARA CENTROS DE CUSTO
+        
+        function abrirModalCentro() {
+            document.getElementById('modal-titulo-centro').textContent = 'Cadastrar Novo Centro de Custo';
+            document.getElementById('form-centro').reset();
+            document.getElementById('centro-id').value = '';
+            document.getElementById('centro-status').value = 'Ativo';
+            abrirModal('modal-centro');
+        }
+        
+        function salvarCentro() {
+            const id = document.getElementById('centro-id').value;
+            const centro = {
+                codigo: document.getElementById('centro-codigo').value.trim(),
+                nome: document.getElementById('centro-nome').value.trim(),
+                responsavel: document.getElementById('centro-responsavel').value.trim(),
+                departamento: document.getElementById('centro-departamento').value.trim(),
+                status: document.getElementById('centro-status').value,
+                observacoes: document.getElementById('centro-observacoes').value.trim()
+            };
+            
+            if (id) {
+                // Edição
+                centro.id = parseInt(id);
+                const index = listaCentros.findIndex(item => item.id === centro.id);
+                if (index !== -1) {
+                    listaCentros[index] = centro;
+                    mostrarToast('Centro de custo atualizado com sucesso!', 'sucesso');
+                }
+            } else {
+                // Novo cadastro
+                centro.id = listaCentros.length > 0 ? Math.max(...listaCentros.map(item => item.id)) + 1 : 1;
+                listaCentros.push(centro);
+                mostrarToast('Centro de custo cadastrado com sucesso!', 'sucesso');
+            }
+            
+            carregarTabelaCentros();
+            fecharModal('modal-centro');
+        }
+        
+        function carregarTabelaCentros() {
+            const tabela = document.getElementById('tabela-centros');
+            const semRegistros = document.getElementById('sem-registros-centros');
+            
+            tabela.innerHTML = '';
+            
+            if (listaCentros.length === 0) {
+                tabela.parentElement.classList.add('hidden');
+                semRegistros.classList.remove('hidden');
+                return;
+            }
+            
+            tabela.parentElement.classList.remove('hidden');
+            semRegistros.classList.add('hidden');
+            
+            listaCentros.forEach(centro => {
+                const tr = document.createElement('tr');
+                const statusClass = centro.status === 'Ativo' ? 'text-success' : 'text-danger';
+                
+                tr.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">${centro.codigo}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">${centro.nome}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">${centro.responsavel}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">${centro.departamento}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm ${statusClass} font-medium">${centro.status}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                        <button 
+                            onclick="editarCentro(${centro.id})" 
+                            class="text-primary hover:text-primary/80 mr-2" 
+                            title="Editar"
+                        >
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button 
+                            onclick="excluirCentro(${centro.id})" 
+                            class="text-danger hover:text-danger/80" 
+                            title="Excluir"
+                        >
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    </td>
+                `;
+                
+                tabela.appendChild(tr);
+            });
+        }
+        
+        function editarCentro(id) {
+            const centro = listaCentros.find(c => c.id === id);
+            if (!centro) return;
+            
+            document.getElementById('modal-titulo-centro').textContent = `Editar Centro de Custo: ${centro.nome}`;
+            document.getElementById('centro-id').value = centro.id;
+            document.getElementById('centro-codigo').value = centro.codigo;
+            document.getElementById('centro-nome').value = centro.nome;
+            document.getElementById('centro-responsavel').value = centro.responsavel;
+            document.getElementById('centro-departamento').value = centro.departamento;
+            document.getElementById('centro-status').value = centro.status;
+            document.getElementById('centro-observacoes').value = centro.observacoes || '';
+            
+            abrirModal('modal-centro');
+        }
+        
+        // FUNÇÃO ATUALIZADA: Excluir Centro de Custo com novo modal de confirmação
+        function excluirCentro(id) {
+            confirmarExclusao(
+                'Tem certeza que deseja excluir este centro de custo?',
+                function(idCentro) {
+                    listaCentros = listaCentros.filter(centro => centro.id !== idCentro);
+                    carregarTabelaCentros();
+                    mostrarToast('Centro de custo excluído com sucesso!', 'sucesso');
+                },
+                id
+            );
+        }
+        
+        function buscarCentros() {
+            const textoBusca = document.getElementById('busca-centro').value.toLowerCase();
+            
+            if (!textoBusca) {
+                carregarTabelaCentros();
+                return;
+            }
+            
+            const resultado = listaCentros.filter(centro => 
+                centro.nome.toLowerCase().includes(textoBusca) || 
+                centro.codigo.toLowerCase().includes(textoBusca)
+            );
+            
+            carregarTabelaCentros(resultado);
+            
+            if (resultado.length === 0) {
+                mostrarToast('Nenhum centro de custo encontrado com o termo buscado.', 'info');
+            }
+        }
+        
+        // FUNÇÕES DE IMPORTAÇÃO E EXPORTAÇÃO CSV MELHORADAS
+        
+        // NOVA FUNÇÃO MÉTODO DE DOWNLOAD DIRETO - SUBSTITUIÇÃO COMPLETA
+        function downloadCSVDireto(tipo) {
+            let dados = [];
+            let cabecalho = [];
+            let nomeArquivo = '';
+            
+            // Definir dados, cabeçalhos e nome de arquivo com base no tipo
+            if (tipo === 'epis') {
+                cabecalho = ['ID', 'Nome', 'Código', 'Categoria', 'Unidade', 'Estoque', 'Estoque Mínimo', 'Custo', 'CA'];
+                dados = listaEPIs.map(epi => [
+                    epi.id,
+                    epi.nome,
+                    epi.codigo || '',
+                    epi.categoria,
+                    epi.unidade,
+                    epi.estoque,
+                    epi.estoqueMinimo,
+                    epi.custo,
+                    epi.ca || ''
+                ]);
+                nomeArquivo = 'epis.csv';
+            } else if (tipo === 'entradas') {
+                cabecalho = ['ID', 'EPI ID', 'Data', 'Quantidade', 'Custo', 'Nota Fiscal'];
+                dados = listaEntradas.map(entrada => [
+                    entrada.id,
+                    entrada.epiId,
+                    entrada.data,
+                    entrada.quantidade,
+                    entrada.custo,
+                    entrada.notaFiscal || ''
+                ]);
+                nomeArquivo = 'entradas.csv';
+            } else if (tipo === 'saidas') {
+                cabecalho = ['ID', 'EPI ID', 'Data', 'Quantidade', 'Destinatário', 'Setor'];
+                dados = listaSaidas.map(saida => [
+                    saida.id,
+                    saida.epiId,
+                    saida.data,
+                    saida.quantidade,
+                    saida.destinatario,
+                    saida.setor
+                ]);
+                nomeArquivo = 'saidas.csv';
+            } else if (tipo === 'centros') {
+                cabecalho = ['ID', 'Código', 'Nome', 'Responsável', 'Departamento', 'Status', 'Observações'];
+                dados = listaCentros.map(centro => [
+                    centro.id,
+                    centro.codigo,
+                    centro.nome,
+                    centro.responsavel,
+                    centro.departamento,
+                    centro.status,
+                    centro.observacoes || ''
+                ]);
+                nomeArquivo = 'centros.csv';
+            }
+            
+            // Verificar se há dados para exportar
+            if (dados.length === 0) {
+                mostrarToast(`Não há dados de ${tipo} para exportar.`, 'aviso');
+                return;
+            }
+            
+            try {
+                // Mostrar mensagem de progresso
+                mostrarToast(`Preparando exportação de ${dados.length} registros...`, 'info');
+                
+                // Adicionar texto direto ao arquivo sem usar o DOM
+                let linhasTexto = [];
+                
+                // Adicionar linha de cabeçalho
+                linhasTexto.push(cabecalho.join(','));
+                
+                // Adicionar linhas de dados
+                dados.forEach(linha => {
+                    // Processar cada valor para escapar corretamente
+                    const valoresEscapados = linha.map(valor => {
+                        // Converter para string e tratar casos especiais
+                        const str = String(valor || '');
+                        if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
+                            return `"${str.replace(/"/g, '""')}"`;
+                        }
+                        return str;
+                    });
+                    
+                    // Adicionar linha formada pelos valores separados por vírgula
+                    linhasTexto.push(valoresEscapados.join(','));
+                });
+                
+                // Garantir quebras de linha explícitas entre os registros
+                // Usamos CRLF (\r\n) para máxima compatibilidade
+                let conteudoFinal = linhasTexto.join('\r\n');
+                
+                // Vamos adicionar mensagens para o usuário ver o conteúdo
+                console.log("CONTEÚDO CSV GERADO:");
+                console.log(conteudoFinal);
+                console.log("NÚMERO DE LINHAS:", linhasTexto.length);
+                
+                // Tratamento especial para navegadores
+                // Adicionar BOM (Byte Order Mark) para indicar UTF-8
+                const blob = new Blob(['\ufeff' + conteudoFinal], { type: 'text/csv;charset=utf-8' });
+                
+                // Criar link para download
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.setAttribute('href', url);
+                link.setAttribute('download', nomeArquivo);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                
+                // Forçar evento de clique do link
+                link.click();
+                
+                // Remover link após download
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+                
+                mostrarToast(`Arquivo ${tipo}.csv exportado com sucesso! Verifique seus downloads.`, 'sucesso');
+                
+            } catch (erro) {
+                console.error("Erro na exportação CSV:", erro);
+                alert(`Erro ao exportar dados de ${tipo}: ${erro.message}`);
+            }
+        }
+        
+        // Função para analisar linha CSV
+        function parseCSVLine(linha) {
+            const resultado = [];
+            let atual = '';
+            let entreAspas = false;
+            
+            for (let i = 0; i < linha.length; i++) {
+                const char = linha[i];
+                
+                if (char === '"') {
+                    if (entreAspas) {
+                        // Verificar se é um escape de aspas
+                        if (i + 1 < linha.length && linha[i + 1] === '"') {
+                            atual += '"';
+                            i++; // Pular a próxima aspa
+                        } else {
+                            entreAspas = false;
+                        }
+                    } else {
+                        entreAspas = true;
+                    }
+                } else if (char === ',' && !entreAspas) {
+                    resultado.push(atual);
+                    atual = '';
+                } else {
+                    atual += char;
+                }
+            }
+            
+            resultado.push(atual); // Adicionar o último valor
+            return resultado;
+        }
+        
+        // Importar dados de CSV
+        function importarCSV(evento, tipo) {
+            const arquivo = evento.target.files[0];
+            if (!arquivo) return;
+            
+            mostrarToast(`Processando arquivo ${arquivo.name}...`, 'info');
+            
+            const leitor = new FileReader();
+            
+            leitor.onload = function(e) {
+                try {
+                    // Ler o conteúdo do arquivo
+                    const conteudo = e.target.result;
+                    
+                    // Verificar se começa com BOM (Byte Order Mark) e remover
+                    const textoLimpo = conteudo.charCodeAt(0) === 0xFEFF 
+                        ? conteudo.substring(1) 
+                        : conteudo;
+                    
+                    // Dividir linhas
+                    const linhas = textoLimpo.split(/\r?\n/).filter(linha => linha.trim() !== '');
+                    
+                    // Verificar se há pelo menos um cabeçalho e uma linha de dados
+                    if (linhas.length < 2) {
+                        mostrarToast('O arquivo não contém dados suficientes.', 'erro');
+                        return;
+                    }
+                    
+                    // Obter cabeçalho
+                    const cabecalho = parseCSVLine(linhas[0]);
+                    
+                    // Processar dados
+                    const dadosImportados = [];
+                    
+                    for (let i = 1; i < linhas.length; i++) {
+                        if (linhas[i].trim() === '') continue;
+                        
+                        const valores = parseCSVLine(linhas[i]);
+                        const objeto = {};
+                        
+                        // Mapear valores para propriedades
+                        for (let j = 0; j < cabecalho.length; j++) {
+                            if (j >= valores.length) continue; // Ignorar se não houver valor correspondente
+                            
+                            const propriedade = cabecalho[j].toLowerCase();
+                            let valor = valores[j];
+                            
+                            // Limpar espaços no início e fim
+                            if (typeof valor === 'string') {
+                                valor = valor.trim();
+                            }
+                            
+                            // Converter tipos de dados
+                            if (propriedade === 'id' || propriedade === 'epi id' || propriedade === 'epiid' || 
+                                propriedade === 'estoque' || propriedade === 'estoque mínimo' || propriedade === 'estoqueminimo' || 
+                                propriedade === 'quantidade') {
+                                valor = valor ? parseInt(valor) : 0;
+                            } else if (propriedade === 'custo') {
+                                valor = valor ? parseFloat(valor) : 0;
+                            }
+                            
+                            // Mapeamento específico por tipo
+                            if (tipo === 'epis') {
+                                if (propriedade === 'id') objeto.id = valor;
+                                else if (propriedade === 'nome') objeto.nome = valor;
+                                else if (propriedade === 'código' || propriedade === 'codigo') objeto.codigo = valor;
+                                else if (propriedade === 'categoria') objeto.categoria = valor;
+                                else if (propriedade === 'unidade') objeto.unidade = valor;
+                                else if (propriedade === 'estoque') objeto.estoque = valor;
+                                else if (propriedade === 'estoque mínimo' || propriedade === 'estoqueminimo') objeto.estoqueMinimo = valor;
+                                else if (propriedade === 'custo') objeto.custo = valor;
+                                else if (propriedade === 'ca') objeto.ca = valor;
+                            } else if (tipo === 'entradas') {
+                                if (propriedade === 'id') objeto.id = valor;
+                                else if (propriedade === 'epi id' || propriedade === 'epiid') objeto.epiId = valor;
+                                else if (propriedade === 'data') objeto.data = valor;
+                                else if (propriedade === 'quantidade') objeto.quantidade = valor;
+                                else if (propriedade === 'custo') objeto.custo = valor;
+                                else if (propriedade === 'nota fiscal' || propriedade === 'notafiscal') objeto.notaFiscal = valor;
+                            } else if (tipo === 'saidas') {
+                                if (propriedade === 'id') objeto.id = valor;
+                                else if (propriedade === 'epi id' || propriedade === 'epiid') objeto.epiId = valor;
+                                else if (propriedade === 'data') objeto.data = valor;
+                                else if (propriedade === 'quantidade') objeto.quantidade = valor;
+                                else if (propriedade === 'destinatário' || propriedade === 'destinatario') objeto.destinatario = valor;
+                                else if (propriedade === 'setor') objeto.setor = valor;
+                            } else if (tipo === 'centros') {
+                                if (propriedade === 'id') objeto.id = valor;
+                                else if (propriedade === 'código' || propriedade === 'codigo') objeto.codigo = valor;
+                                else if (propriedade === 'nome') objeto.nome = valor;
+                                else if (propriedade === 'responsável' || propriedade === 'responsavel') objeto.responsavel = valor;
+                                else if (propriedade === 'departamento') objeto.departamento = valor;
+                                else if (propriedade === 'status') objeto.status = valor;
+                                else if (propriedade === 'observações' || propriedade === 'observacoes') objeto.observacoes = valor;
+                            }
+                        }
+                        
+                        // Garantir que todos os objetos tenham um ID
+                        if (!objeto.id) {
+                            if (tipo === 'epis') objeto.id = listaEPIs.length > 0 ? Math.max(...listaEPIs.map(e => e.id)) + 1 + dadosImportados.length : 1 + dadosImportados.length;
+                            else if (tipo === 'entradas') objeto.id = listaEntradas.length > 0 ? Math.max(...listaEntradas.map(e => e.id)) + 1 + dadosImportados.length : 1 + dadosImportados.length;
+                            else if (tipo === 'saidas') objeto.id = listaSaidas.length > 0 ? Math.max(...listaSaidas.map(s => s.id)) + 1 + dadosImportados.length : 1 + dadosImportados.length;
+                            else if (tipo === 'centros') objeto.id = listaCentros.length > 0 ? Math.max(...listaCentros.map(c => c.id)) + 1 + dadosImportados.length : 1 + dadosImportados.length;
+                        }
+                        
+                        // Adicionar objeto à lista de importados
+                        dadosImportados.push(objeto);
+                    }
+                    
+                    // Verificar se há dados para importar
+                    if (dadosImportados.length === 0) {
+                        mostrarToast('Não foram encontrados dados válidos para importar.', 'aviso');
+                        return;
+                    }
+                    
+                    // Usar nosso novo modal de confirmação em vez do confirm()
+                    confirmarExclusao(
+                        `Deseja importar ${dadosImportados.length} registros de ${tipo}?`,
+                        function(dados) {
+                            // Aplicar dados importados
+                            if (tipo === 'epis') {
+                                listaEPIs = [...listaEPIs, ...dados];
+                                carregarTabelaEPIs();
+                            } else if (tipo === 'entradas') {
+                                // Atualizar estoques
+                                dados.forEach(entrada => {
+                                    const epi = listaEPIs.find(e => e.id === entrada.epiId);
+                                    if (epi) {
+                                        epi.estoque += entrada.quantidade;
+                                    }
+                                });
+                                
+                                listaEntradas = [...listaEntradas, ...dados];
+                                carregarTabelaEntradas();
+                            } else if (tipo === 'saidas') {
+                                // Verificar estoques
+                                let estoqueInsuficiente = false;
+                                for (const saida of dados) {
+                                    const epi = listaEPIs.find(e => e.id === saida.epiId);
+                                    if (epi && epi.estoque < saida.quantidade) {
+                                        estoqueInsuficiente = true;
+                                        break;
+                                    }
+                                }
+                                
+                                if (estoqueInsuficiente) {
+                                    confirmarExclusao(
+                                        'Alguns EPIs não têm estoque suficiente. Continuar mesmo assim?',
+                                        function(dadosSaida) {
+                                            // Atualizar estoques
+                                            dadosSaida.forEach(saida => {
+                                                const epi = listaEPIs.find(e => e.id === saida.epiId);
+                                                if (epi) {
+                                                    epi.estoque -= saida.quantidade;
+                                                    if (epi.estoque < 0) epi.estoque = 0;
+                                                }
+                                            });
+                                            
+                                            listaSaidas = [...listaSaidas, ...dadosSaida];
+                                            carregarTabelaSaidas();
+                                            mostrarToast(`${dadosSaida.length} registros de ${tipo} importados com sucesso!`, 'sucesso');
+                                        },
+                                        dados
+                                    );
+                                } else {
+                                    // Atualizar estoques
+                                    dados.forEach(saida => {
+                                        const epi = listaEPIs.find(e => e.id === saida.epiId);
+                                        if (epi) {
+                                            epi.estoque -= saida.quantidade;
+                                            if (epi.estoque < 0) epi.estoque = 0;
+                                        }
+                                    });
+                                    
+                                    listaSaidas = [...listaSaidas, ...dados];
+                                    carregarTabelaSaidas();
+                                    mostrarToast(`${dados.length} registros de ${tipo} importados com sucesso!`, 'sucesso');
+                                }
+                            } else if (tipo === 'centros') {
+                                listaCentros = [...listaCentros, ...dados];
+                                carregarTabelaCentros();
+                                mostrarToast(`${dados.length} registros de ${tipo} importados com sucesso!`, 'sucesso');
+                            }
+                        },
+                        dadosImportados
+                    );
+                } catch (erro) {
+                    console.error("Erro na importação:", erro);
+                    mostrarToast(`Erro ao importar dados: ${erro.message}`, 'erro');
+                    alert(`Ocorreu um erro durante a importação: ${erro.message}`);
+                }
+                
+                // Limpar o input de arquivo
+                evento.target.value = '';
+            };
+            
+            leitor.onerror = function(erro) {
+                console.error("Erro ao ler arquivo:", erro);
+                mostrarToast('Erro ao ler o arquivo.', 'erro');
+                evento.target.value = '';
+            };
+            
+            // Ler o arquivo como texto
+            leitor.readAsText(arquivo);
+        }
+        
+        // Baixar templates CSV
+        function baixarTemplate(tipo) {
+            let conteudo = '';
+            let nomeArquivo = '';
+            
+            if (tipo === 'epis') {
+                conteudo = 'ID,Nome,Código,Categoria,Unidade,Estoque,Estoque Mínimo,Custo,CA\n' +
+                           '1,Capacete de Segurança,CP001,Capacetes,Unidade,50,10,35.90,12345\n' +
+                           '2,Luva de Proteção,LV001,Luvas,Par,100,20,12.50,54321';
+                nomeArquivo = 'template-epis.csv';
+            } else if (tipo === 'entradas') {
+                conteudo = 'ID,EPI ID,Data,Quantidade,Custo,Nota Fiscal\n' +
+                           '1,1,2023-05-10,20,35.90,NF001\n' +
+                           '2,2,2023-05-15,50,12.50,NF002';
+                nomeArquivo = 'template-entradas.csv';
+            } else if (tipo === 'saidas') {
+                conteudo = 'ID,EPI ID,Data,Quantidade,Destinatário,Setor\n' +
+                           '1,1,2023-05-20,5,Carlos Ferreira,Produção\n' +
+                           '2,2,2023-05-22,10,Equipe de Manutenção,Manutenção';
+                nomeArquivo = 'template-saidas.csv';
+            } else if (tipo === 'centros') {
+                conteudo = 'ID,Código,Nome,Responsável,Departamento,Status,Observações\n' +
+                           '1,CC001,Obra Ponte Rio-Niterói,Roberto Almeida,Obras Externas,Ativo,Centro de custo responsável pela obra\n' +
+                           '2,CC002,Reforma Aeroporto,Carla Ferreira,Reformas,Ativo,Reformas no terminal 2';
+                nomeArquivo = 'template-centros.csv';
+            }
+            
+            // Adicionar BOM para indicar UTF-8
+            conteudo = '\ufeff' + conteudo;
+            
+            // Criar blob e download
+            const blob = new Blob([conteudo], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = nomeArquivo;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            mostrarToast(`Template de ${tipo} baixado com sucesso!`, 'sucesso');
+        }
+
+        // FUNÇÕES DE RELATÓRIOS
+
+        // Inicializar relatórios
+        function inicializarRelatorios() {
+            // Definir data padrão (último mês)
+            const hoje = new Date();
+            const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
+            const fimMes = new Date(hoje.getFullYear(), hoje.getMonth(), 0);
+            
+            document.getElementById('relatorio-periodo-inicio').value = inicioMes.toISOString().split('T')[0];
+            document.getElementById('relatorio-periodo-fim').value = fimMes.toISOString().split('T')[0];
+            
+            // Ocultar resultados
+            document.getElementById('relatorio-resultado').classList.add('hidden');
+        }
+
+        // Gerar relatório
+        function gerarRelatorio() {
+            const inicio = document.getElementById('relatorio-periodo-inicio').value;
+            const fim = document.getElementById('relatorio-periodo-fim').value;
+            const categoria = document.getElementById('relatorio-categoria').value;
+            
+            if (!inicio || !fim) {
+                mostrarToast('Selecione o período para o relatório.', 'aviso');
+                return;
+            }
+            
+            // Filtrar saídas pelo período
+            const saidasFiltradas = listaSaidas.filter(saida => {
+                const dataSaida = new Date(saida.data);
+                return dataSaida >= new Date(inicio) && dataSaida <= new Date(fim);
+            });
+            
+            if (saidasFiltradas.length === 0) {
+                mostrarToast('Não foram encontradas saídas no período selecionado.', 'info');
+                return;
+            }
+            
+            // Processar dados do relatório
+            const dadosRelatorio = [];
+            let totalQuantidade = 0;
+            let totalValor = 0;
+            const contadorEPIs = {};
+            const contadorCategorias = {};
+            
+            // Processar saídas
+            saidasFiltradas.forEach(saida => {
+                const epi = listaEPIs.find(e => e.id === saida.epiId);
+                if (!epi) return;
+                
+                // Filtrar por categoria se for selecionada
+                if (categoria && epi.categoria !== categoria) return;
+                
+                // Verificar se o EPI já está nos dados do relatório
+                let item = dadosRelatorio.find(d => d.epiId === epi.id);
+                
+                if (!item) {
+                    item = {
+                        epiId: epi.id,
+                        nome: epi.nome,
+                        categoria: epi.categoria,
+                        quantidade: 0,
+                        valorUnitario: epi.custo,
+                        valorTotal: 0
+                    };
+                    dadosRelatorio.push(item);
+                }
+                
+                // Atualizar quantidade e valor
+                item.quantidade += saida.quantidade;
+                item.valorTotal += saida.quantidade * epi.custo;
+                
+                // Atualizar totais
+                totalQuantidade += saida.quantidade;
+                totalValor += saida.quantidade * epi.custo;
+                
+                // Contadores para estatísticas
+                contadorEPIs[epi.id] = (contadorEPIs[epi.id] || 0) + saida.quantidade;
+                contadorCategorias[epi.categoria] = (contadorCategorias[epi.categoria] || 0) + saida.quantidade;
+            });
+            
+            // Calcular percentuais
+            dadosRelatorio.forEach(item => {
+                item.percentual = totalValor > 0 ? (item.valorTotal / totalValor * 100).toFixed(2) : 0;
+            });
+            
+            // Ordenar por valor total (decrescente)
+            dadosRelatorio.sort((a, b) => b.valorTotal - a.valorTotal);
+            
+            // Encontrar o EPI mais consumido
+            let epiMaisConsumido = { id: null, quantidade: 0 };
+            Object.keys(contadorEPIs).forEach(id => {
+                if (contadorEPIs[id] > epiMaisConsumido.quantidade) {
+                    epiMaisConsumido = { id: parseInt(id), quantidade: contadorEPIs[id] };
+                }
+            });
+            
+            // Encontrar a categoria mais consumida
+            let categoriaMaisConsumida = { nome: null, quantidade: 0 };
+            Object.keys(contadorCategorias).forEach(cat => {
+                if (contadorCategorias[cat] > categoriaMaisConsumida.quantidade) {
+                    categoriaMaisConsumida = { nome: cat, quantidade: contadorCategorias[cat] };
+                }
+            });
+            
+            // Atualizar o título do relatório
+            let titulo = "Consumo de EPIs";
+            if (categoria) {
+                titulo += ` - Categoria: ${categoria}`;
+            }
+            titulo += ` (${formatarData(inicio)} a ${formatarData(fim)})`;
+            document.getElementById('relatorio-titulo').textContent = titulo;
+            
+            // Atualizar indicadores
+            document.getElementById('indicador-total-itens').textContent = totalQuantidade;
+            document.getElementById('indicador-valor-total').textContent = formatarMoeda(totalValor);
+            
+            const epiNome = epiMaisConsumido.id ? listaEPIs.find(e => e.id === epiMaisConsumido.id)?.nome || '-' : '-';
+            document.getElementById('indicador-maior-epi').textContent = epiNome;
+            document.getElementById('indicador-maior-categoria').textContent = categoriaMaisConsumida.nome || '-';
+            
+            // Preencher tabela
+            const tabela = document.getElementById('tabela-relatorio-consumo');
+            tabela.innerHTML = '';
+            
+            dadosRelatorio.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">${item.nome}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">${item.categoria}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">${item.quantidade}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">${formatarMoeda(item.valorUnitario)}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">${formatarMoeda(item.valorTotal)}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">${item.percentual}%</td>
+                `;
+                tabela.appendChild(tr);
+            });
+            
+            // Atualizar totais
+            document.getElementById('total-quantidade').textContent = totalQuantidade;
+            document.getElementById('total-valor').textContent = formatarMoeda(totalValor);
+            
+            // Mostrar resultado
+            document.getElementById('relatorio-resultado').classList.remove('hidden');
+        }
+
+        // Exportar relatório para PDF
+        function exportarRelatorioPDF() {
+            mostrarToast('Exportação para PDF iniciada. O download começará em breve...', 'info');
+            
+            try {
+                // Inicializar o documento PDF
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF('p', 'mm', 'a4');
+                
+                // Obter dados do relatório
+                const periodoInicio = document.getElementById('relatorio-periodo-inicio').value;
+                const periodoFim = document.getElementById('relatorio-periodo-fim').value;
+                const titulo = document.getElementById('relatorio-titulo').textContent;
+                
+                // Adicionar cabeçalho
+                doc.setFontSize(16);
+                doc.setFont('helvetica', 'bold');
+                doc.text('Sistema de Controle de EPIs', 105, 15, { align: 'center' });
+                
+                doc.setFontSize(12);
+                doc.text(titulo, 105, 25, { align: 'center' });
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(10);
+                doc.text(`Período: ${formatarData(periodoInicio)} a ${formatarData(periodoFim)}`, 105, 32, { align: 'center' });
+                
+                // Adicionar indicadores
+                doc.setFontSize(11);
+                doc.setFont('helvetica', 'bold');
+                doc.text('Resumo', 14, 42);
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(10);
+                
+                const totalItens = document.getElementById('indicador-total-itens').textContent;
+                const valorTotal = document.getElementById('indicador-valor-total').textContent;
+                const maiorCategoria = document.getElementById('indicador-maior-categoria').textContent;
+                const maiorEPI = document.getElementById('indicador-maior-epi').textContent;
+                
+                doc.text(`Total de Itens: ${totalItens}`, 14, 50);
+                doc.text(`Valor Total: ${valorTotal}`, 14, 56);
+                doc.text(`Maior Categoria: ${maiorCategoria}`, 14, 62);
+                doc.text(`EPI Mais Consumido: ${maiorEPI}`, 14, 68);
+                
+                // Adicionar tabela de dados
+                doc.setFontSize(11);
+                doc.setFont('helvetica', 'bold');
+                doc.text('Detalhamento do Consumo', 14, 78);
+                
+                // Extrair dados da tabela
+                const tabela = document.getElementById('tabela-relatorio-consumo');
+                const dadosTabela = [];
+                
+                // Cabeçalhos
+                const cabecalhos = [
+                    'EPI', 
+                    'Categoria', 
+                    'Quantidade', 
+                    'Valor Unitário', 
+                    'Valor Total', 
+                    '% do Total'
+                ];
+                
+                dadosTabela.push(cabecalhos);
+                
+                // Dados das linhas
+                if (tabela) {
+                    Array.from(tabela.rows).forEach(row => {
+                        const dados = Array.from(row.cells).map(cell => cell.textContent.trim());
+                        dadosTabela.push(dados);
+                    });
+                }
+                
+                // Rodapé com totais
+                const totalQuantidade = document.getElementById('total-quantidade').textContent;
+                const totalValorRodape = document.getElementById('total-valor').textContent;
+                dadosTabela.push([
+                    'TOTAL', '', totalQuantidade, '', totalValorRodape, '100%'
+                ]);
+                
+                // Gerar a tabela no PDF
+                doc.autoTable({
+                    startY: 82,
+                    head: [dadosTabela[0]],
+                    body: dadosTabela.slice(1),
+                    theme: 'grid',
+                    headStyles: {
+                        fillColor: [93, 92, 222],
+                        textColor: [255, 255, 255],
+                        fontStyle: 'bold'
+                    },
+                    footStyles: {
+                        fillColor: [240, 240, 240],
+                        textColor: [0, 0, 0],
+                        fontStyle: 'bold'
+                    },
+                    styles: {
+                        fontSize: 8
+                    },
+                    columnStyles: {
+                        0: { cellWidth: 40 }, // EPI
+                        1: { cellWidth: 25 }, // Categoria
+                        2: { cellWidth: 20 }, // Quantidade
+                        3: { cellWidth: 25 }, // Valor Unitário
+                        4: { cellWidth: 25 }, // Valor Total
+                        5: { cellWidth: 20 }  // % do Total
+                    }
+                });
+                
+                // Adicionar informação de data de geração
+                const dataGeracao = new Date();
+                doc.setFontSize(8);
+                doc.text(
+                    `Relatório gerado em: ${dataGeracao.toLocaleString()}`, 
+                    doc.internal.pageSize.getWidth() - 14, 
+                    doc.internal.pageSize.getHeight() - 10, 
+                    { align: 'right' }
+                );
+                
+                // Gerar nome do arquivo
+                const dataFormatada = dataGeracao.toISOString().split('T')[0];
+                const nomeArquivo = `relatorio_epis_${dataFormatada}.pdf`;
+                
+                // Salvar o PDF
+                doc.save(nomeArquivo);
+                
+                mostrarToast('Relatório PDF exportado com sucesso!', 'sucesso');
+            } catch (error) {
+                console.error("Erro ao exportar PDF:", error);
+                mostrarToast('Erro ao gerar o PDF. Verifique o console para detalhes.', 'erro');
+            }
+        }
+
+        // Exportar relatório para Excel
+        function exportarRelatorioExcel() {
+            mostrarToast('Exportação para Excel iniciada. O download começará em breve...', 'info');
+            
+            try {
+                // Obter informações do relatório
+                const titulo = document.getElementById('relatorio-titulo').textContent;
+                const periodoInicio = document.getElementById('relatorio-periodo-inicio').value;
+                const periodoFim = document.getElementById('relatorio-periodo-fim').value;
+                const periodo = `${formatarData(periodoInicio)} a ${formatarData(periodoFim)}`;
+                
+                // Obter dados do resumo
+                const totalItens = document.getElementById('indicador-total-itens').textContent;
+                const valorTotal = document.getElementById('indicador-valor-total').textContent;
+                const maiorCategoria = document.getElementById('indicador-maior-categoria').textContent;
+                const maiorEPI = document.getElementById('indicador-maior-epi').textContent;
+                
+                // Obter dados da tabela
+                const tabela = document.getElementById('tabela-relatorio-consumo');
+                const dadosTabela = [];
+                
+                // Cabeçalhos
+                const cabecalhos = [
+                    'EPI', 
+                    'Categoria', 
+                    'Quantidade', 
+                    'Valor Unitário', 
+                    'Valor Total', 
+                    '% do Total'
+                ];
+                
+                // Dados das linhas
+                if (tabela) {
+                    Array.from(tabela.rows).forEach(row => {
+                        const dados = Array.from(row.cells).map(cell => cell.textContent.trim());
+                        dadosTabela.push(dados);
+                    });
+                }
+                
+                // Criar workbook
+                const wb = XLSX.utils.book_new();
+                
+                // Criar planilha para o resumo
+                const resumoDados = [
+                    ['Sistema de Controle de EPIs'],
+                    [titulo],
+                    ['Período:', periodo],
+                    [''],
+                    ['Resumo'],
+                    ['Total de Itens:', totalItens],
+                    ['Valor Total:', valorTotal],
+                    ['Maior Categoria:', maiorCategoria],
+                    ['EPI Mais Consumido:', maiorEPI],
+                    ['']
+                ];
+                
+                const wsResumo = XLSX.utils.aoa_to_sheet(resumoDados);
+                
+                // Configurar estilo de células (negrito, tamanho, etc)
+                wsResumo['!merges'] = [
+                    { s: { r: 0, c: 0 }, e: { r: 0, c: 5 } }, // Mesclar células do título
+                    { s: { r: 1, c: 0 }, e: { r: 1, c: 5 } }  // Mesclar células do subtítulo
+                ];
+                
+                // Criar planilha para os dados detalhados
+                const detalhesDados = [
+                    ['Detalhamento do Consumo'],
+                    [''],
+                    cabecalhos,
+                    ...dadosTabela
+                ];
+                
+                // Adicionar totais
+                const totalQuantidade = document.getElementById('total-quantidade').textContent;
+                const totalValorRodape = document.getElementById('total-valor').textContent;
+                detalhesDados.push(['TOTAL', '', totalQuantidade, '', totalValorRodape, '100%']);
+                
+                const wsDetalhes = XLSX.utils.aoa_to_sheet(detalhesDados);
+                
+                // Adicionar planilhas ao workbook
+                XLSX.utils.book_append_sheet(wb, wsResumo, "Resumo");
+                XLSX.utils.book_append_sheet(wb, wsDetalhes, "Detalhamento");
+                
+                // Gerar nome do arquivo
+                const dataGeracao = new Date();
+                const dataFormatada = dataGeracao.toISOString().split('T')[0];
+                const nomeArquivo = `relatorio_epis_${dataFormatada}.xlsx`;
+                
+                // Exportar arquivo
+                XLSX.writeFile(wb, nomeArquivo);
+                
+                mostrarToast('Relatório Excel exportado com sucesso!', 'sucesso');
+            } catch (error) {
+                console.error("Erro ao exportar Excel:", error);
+                mostrarToast('Erro ao gerar o Excel. Verifique o console para detalhes.', 'erro');
+            }
+        }
+    </script>
+</body>
+</html>
